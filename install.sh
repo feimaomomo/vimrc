@@ -588,15 +588,25 @@ install_shell_config() {
 
 install_yazi_config() {
 	local yazi_dir="$CONFIG_HOME/yazi"
-	local yazi_file="$yazi_dir/yazi.toml"
-	local yazi_source="$CONFIG_DIR/yazi/yazi.toml"
+	local name yazi_file yazi_source
+	local installed=0
 	mkdir -p "$yazi_dir"
-	if [[ -L "$yazi_file" && "$(readlink "$yazi_file")" == "$yazi_source" ]]; then
-		return
+	# init.lua defines the size_and_mtime linemode that yazi.toml selects. Yazi
+	# only validates that name's length, so a host with yazi.toml but no init.lua
+	# silently prints the literal string "size_and_mtime" on every row.
+	for name in yazi.toml init.lua; do
+		yazi_file="$yazi_dir/$name"
+		yazi_source="$CONFIG_DIR/yazi/$name"
+		if [[ -L "$yazi_file" && "$(readlink "$yazi_file")" == "$yazi_source" ]]; then
+			continue
+		fi
+		backup_once "$yazi_file"
+		ln -sfn "$yazi_source" "$yazi_file"
+		installed=1
+	done
+	if (( installed )); then
+		log "Installed Yazi configuration"
 	fi
-	backup_once "$yazi_file"
-	ln -sfn "$yazi_source" "$yazi_file"
-	log "Installed Yazi configuration"
 }
 
 install_lazygit_config() {
