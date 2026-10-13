@@ -68,8 +68,33 @@ if (( ! $+functions[_zsh_autosuggest_start] )); then
     source "$_portable_zsh_plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
 fi
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=60'
-if command -v fzf >/dev/null 2>&1 && (( ! $+widgets[fzf-file-widget] )); then
-  source <(fzf --zsh)
+# `fzf --zsh` has hung indefinitely on overloaded HPC login nodes, leaving tmux
+# panes blank. Source a cached copy instead and regenerate it, with a short
+# bound, only when the fzf binary changes. Without a usable cache this shell
+# skips fzf key bindings rather than waiting.
+if (( $+commands[fzf] && ! $+widgets[fzf-file-widget] )); then
+  _fzf_init="${XDG_CACHE_HOME:-$HOME/.cache}/zsh/fzf-init.zsh"
+  if [[ ! -s $_fzf_init || ${commands[fzf]:A} -nt $_fzf_init ]]; then
+    mkdir -p "${_fzf_init:h}"
+    zmodload -F zsh/zselect b:zselect
+    fzf --zsh >| "$_fzf_init.$$" 2>/dev/null &!
+    _fzf_pid=$!
+    for _fzf_wait in {1..20}; do
+      kill -0 $_fzf_pid 2>/dev/null || break
+      zselect -t 10
+    done
+    if kill -0 $_fzf_pid 2>/dev/null; then
+      kill -KILL $_fzf_pid 2>/dev/null
+      rm -f "$_fzf_init.$$"
+    elif [[ -s $_fzf_init.$$ ]]; then
+      mv -f "$_fzf_init.$$" "$_fzf_init"
+    else
+      rm -f "$_fzf_init.$$"
+    fi
+    unset _fzf_pid _fzf_wait
+  fi
+  [[ -s $_fzf_init ]] && source "$_fzf_init"
+  unset _fzf_init
 fi
 if command -v zoxide >/dev/null 2>&1 && (( ! $+functions[__zoxide_z] )); then
   eval "$(zoxide init zsh)"
