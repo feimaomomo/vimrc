@@ -2,6 +2,36 @@
 # the portable-nvim managed block.
 [[ -o interactive ]] || return
 
+# A TUI that dies without cleanup (e.g. claude aborting) leaves mouse and focus
+# reporting on, so every mouse move types "35;84;24M" garbage at the prompt.
+# zsh uses neither, so switch them off before each prompt.
+_reset_input_modes() {
+  print -n '\e[?1000l\e[?1002l\e[?1003l\e[?1004l\e[?1005l\e[?1006l\e[?1015l\e[?1016l'
+}
+autoload -Uz add-zsh-hook
+add-zsh-hook precmd _reset_input_modes
+
+# HPC login nodes cap each account's tasks (Polaris: 256 processes plus
+# threads). OpenMP, BLAS, TVM and pytest-xdist size their pools by the node's
+# cores, so one test run can exhaust the cap; then nothing can start a thread
+# and programs such as claude abort, each dumping a multi-GB core. Keep pools
+# small there unless already set, and skip core dumps.
+if [[ -r /proc/self/cgroup ]]; then
+  _cg_dir=/sys/fs/cgroup${${(M)${(f)"$(</proc/self/cgroup)"}:#0::*}#0::}
+  while [[ $_cg_dir == /sys/fs/cgroup/?* ]]; do
+    if [[ -r $_cg_dir/pids.max && $(<$_cg_dir/pids.max) == <-> ]] && (( $(<$_cg_dir/pids.max) <= 4096 )); then
+      for _cg_var in OMP_NUM_THREADS OPENBLAS_NUM_THREADS MKL_NUM_THREADS TVM_NUM_THREADS \
+        PYTEST_XDIST_AUTO_NUM_WORKERS CMAKE_BUILD_PARALLEL_LEVEL; do
+        [[ -n ${(P)_cg_var} ]] || export $_cg_var=4
+      done
+      ulimit -c 0
+      break
+    fi
+    _cg_dir=${_cg_dir:h}
+  done
+  unset _cg_dir _cg_var
+fi
+
 # Keep shell prompts and command-oriented TUIs in the US input source. This is
 # macOS/Hammerspoon-specific and remains completely disabled on other machines.
 if [[ ${TERMINAL_AUTO_ENGLISH:-0} == 1 && $OSTYPE == darwin* ]] && (( $+commands[hs] )); then
