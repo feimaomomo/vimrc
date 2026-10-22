@@ -1,0 +1,11 @@
+# Layered on config.yml only when lazygit runs inside Neovim (lazygit.nvim).
+# Instead of nesting a second nvim, `e` records the file(s) in
+# $NVIM_LAZYGIT_EDIT and quits lazygit; the plugin's exit callback then opens
+# them in the window lazygit was launched from (lua/config/plugins/lazygit.lua).
+os:
+  edit: 'for f in {{filename}}; do case $f in /*) ;; *) f=$PWD/$f ;; esac; printf "%s\n" "$f"; done > "$NVIM_LAZYGIT_EDIT" && nvim --server "$NVIM" --remote-send q'
+  editAtLine: 'f={{filename}}; case $f in /*) ;; *) f=$PWD/$f ;; esac; printf "%s\t%s\n" "$f" {{line}} > "$NVIM_LAZYGIT_EDIT" && nvim --server "$NVIM" --remote-send q'
+  openDirInEditor: 'f={{dir}}; case $f in /*) ;; *) f=$PWD/$f ;; esac; printf "%s\n" "$f" > "$NVIM_LAZYGIT_EDIT" && nvim --server "$NVIM" --remote-send q'
+  # Editing commit messages / rebase todos must block until saved, so those
+  # still use a nested nvim (editAtLineAndWait is left at lazygit's default).
+  editInTerminal: false
