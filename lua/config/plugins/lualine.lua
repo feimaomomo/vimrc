@@ -96,13 +96,13 @@ return {
           n = colors.red,
           i = colors.green,
           v = colors.blue,
-          ["␖"] = colors.blue,
+          ["\22"] = colors.blue,
           V = colors.blue,
           c = colors.magenta,
           no = colors.red,
           s = colors.orange,
           S = colors.orange,
-          ["␓"] = colors.orange,
+          ["\19"] = colors.orange,
           ic = colors.yellow,
           R = colors.violet,
           Rv = colors.violet,
@@ -183,18 +183,8 @@ return {
     })
 
     local function get_lsp_name()
-      local buf_ft = vim.api.nvim_buf_get_option(0, "filetype")
-      local clients = vim.lsp.get_clients()
-      if next(clients) == nil then
-        return nil
-      end
-      for _, client in ipairs(clients) do
-        local filetypes = client.config.filetypes
-        if filetypes and vim.fn.index(filetypes, buf_ft) ~= -1 then
-          return client.name
-        end
-      end
-      return nil
+      local client = vim.lsp.get_clients({ bufnr = 0 })[1]
+      return client and client.name
     end
 
     ins_left({

@@ -3,9 +3,9 @@ vim.g.mapleader = ","
 local keymap = vim.keymap -- for conciseness
 local opt = { noremap = true, silent = true }
 
-keymap.set("n", "Z", "<cmd>wq<cr>", { desc = "save and quit" })
-keymap.set("x", "Z", "<esc><cmd>wq<cr>", { desc = "save and quit" })
-keymap.set("n", "Q", "ZQ")
+keymap.set("n", "ZZ", "<cmd>wq<cr>", { desc = "save and quit" })
+keymap.set("x", "ZZ", "<esc><cmd>wq<cr>", { desc = "save and quit" })
+keymap.set("n", "QQ", "ZQ", { desc = "quit without saving" })
 
 keymap.set("n", "<F1>", ":w<cr>")
 
@@ -58,16 +58,12 @@ end, { noremap = true, silent = true, desc = "toggle terminal (cwd)" })
 
 keymap.set("n", "<F9>", "<cmd>Yazi toggle<cr>", { desc = "toggle Yazi" })
 
--- IlluminatedWord
-vim.api.nvim_create_autocmd({ "BufEnter" }, { command = ":hi link IlluminatedWordText Visual" })
-vim.api.nvim_create_autocmd({ "BufEnter" }, { command = ":hi link IlluminatedWordRead Visual" })
-vim.api.nvim_create_autocmd({ "BufEnter" }, { command = ":hi link IlluminatedWordWrite Visual" })
-
--- del default keymap
-pcall(vim.keymap.del, 'n', 'gri')
-pcall(vim.keymap.del, 'n', 'grr')
-pcall(vim.keymap.del, 'n', 'gra')
-pcall(vim.keymap.del, 'n', 'grn')
+-- Drop Neovim's default gr* LSP mappings; they make the buffer-local `gr`
+-- (references) wait for timeoutlen. Rename lives on `gR`.
+for _, lhs in ipairs({ "gri", "grr", "gra", "grn", "grt", "grx" }) do
+  pcall(vim.keymap.del, "n", lhs)
+end
+pcall(vim.keymap.del, "x", "gra")
 
 -- barbar --
 keymap.set("n", "<leader>1", "<cmd>BufferGoto 1<cr>", opt)
@@ -83,9 +79,6 @@ keymap.set("n", "<leader>d", function()
     return vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].buflisted
   end, vim.api.nvim_list_bufs())
 
-  if #buffers <= 1 then
-    vim.cmd("quit!")
-  else
-    vim.cmd("BufferClose!")
-  end
+  -- `confirm` asks to save/discard instead of silently dropping changes.
+  vim.cmd(#buffers <= 1 and "confirm quit" or "confirm BufferClose")
 end, { noremap = true, silent = true, desc = "close buf" })

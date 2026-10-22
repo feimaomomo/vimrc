@@ -35,6 +35,19 @@ vim.lsp.enable({
   "cmake_ls",
 })
 
+local diagnostic_signs = {
+  text = {
+    [vim.diagnostic.severity.ERROR] = "󰅚 ",
+    [vim.diagnostic.severity.WARN] = "󰀪 ",
+    [vim.diagnostic.severity.INFO] = "󰋽 ",
+    [vim.diagnostic.severity.HINT] = "󰌶 ",
+  },
+  numhl = {
+    [vim.diagnostic.severity.ERROR] = "ErrorMsg",
+    [vim.diagnostic.severity.WARN] = "WarningMsg",
+  },
+}
+
 vim.diagnostic.config({
   virtual_lines = true,
   virtual_text = false,
@@ -45,19 +58,19 @@ vim.diagnostic.config({
     border = "rounded",
     source = true,
   },
-  signs = {
-    text = {
-      [vim.diagnostic.severity.ERROR] = "󰅚 ",
-      [vim.diagnostic.severity.WARN] = "󰀪 ",
-      [vim.diagnostic.severity.INFO] = "󰋽 ",
-      [vim.diagnostic.severity.HINT] = "󰌶 ",
-    },
-    numhl = {
-      [vim.diagnostic.severity.ERROR] = "ErrorMsg",
-      [vim.diagnostic.severity.WARN] = "WarningMsg",
-    },
-  },
+  signs = diagnostic_signs,
 })
+
+-- vim.diagnostic.config is global, so the toggle state must be global too.
+local diagnostics_shown = true
+local function toggle_diagnostics()
+  diagnostics_shown = not diagnostics_shown
+  vim.diagnostic.config({
+    underline = diagnostics_shown,
+    virtual_lines = diagnostics_shown,
+    signs = diagnostics_shown and diagnostic_signs or false,
+  })
+end
 
 local function formatting_client(client, filetype)
   if filetype == "python" then
@@ -70,15 +83,19 @@ local function formatting_client(client, filetype)
 end
 
 local function format_buffer(bufnr)
-  bufnr = bufnr or 0
   local filetype = vim.bo[bufnr].filetype
+  local filter = function(client)
+    return formatting_client(client, filetype) and client:supports_method("textDocument/formatting", bufnr)
+  end
+  -- Buffers without a formatting server (txt, markdown, ...) save silently.
+  if #vim.tbl_filter(filter, vim.lsp.get_clients({ bufnr = bufnr })) == 0 then
+    return
+  end
   vim.lsp.buf.format({
     bufnr = bufnr,
     async = false,
     timeout_ms = 3000,
-    filter = function(client)
-      return formatting_client(client, filetype)
-    end,
+    filter = filter,
   })
 end
 
@@ -94,14 +111,7 @@ vim.api.nvim_create_autocmd('LspAttach', {
   group = vim.api.nvim_create_augroup('lsp-attach', { clear = true }),
   callback = function(event)
     vim.keymap.set('n', 'gd', function()
-      local params = vim.lsp.util.make_position_params(0, 'utf-8')
-      vim.lsp.buf_request(0, 'textDocument/definition', params, function(_, result, _, _)
-        if not result or vim.tbl_isempty(result) then
-          vim.notify('No definition found', vim.log.levels.INFO)
-        else
-          require('snacks').picker.lsp_definitions()
-        end
-      end)
+      require('snacks').picker.lsp_definitions()
     end, { buffer = event.buf, desc = 'LSP: Goto Definition' })
 
     vim.keymap.set('n', 'gD', function()
@@ -120,69 +130,25 @@ vim.api.nvim_create_autocmd('LspAttach', {
       vim.lsp.buf.definition()
     end, { buffer = event.buf, desc = 'LSP: Goto Definition (split)' })
     vim.keymap.set('n', 'gr', function()
-      -- require('telescope.builtin').lsp_references()
       require('snacks').picker.lsp_references()
     end, { buffer = event.buf, desc = 'LSP: Goto References' })
 
-    -- vim.keymap.set('n', '<leader>a', vim.lsp.buf.code_action, { buffer = event.buf, desc = 'Lsp Action' })
     vim.keymap.set('n', 'gR', vim.lsp.buf.rename, { buffer = event.buf, desc = 'LSP: Rename' })
-
-    -- Diagnostics
-    -- vim.keymap.set('n', '<leader>d', function()
-    --   vim.diagnostic.open_float { source = true }
-    -- end, { buffer = event.buf, desc = 'LSP: Show Diagnostic' })
-    vim.keymap.set(
-      'n',
-      '<leader>t',
-      (function()
-        local diag_status = 1 -- 1 is show; 0 is hide
-        return function()
-          if diag_status == 1 then
-            diag_status = 0
-            vim.diagnostic.config { underline = false, virtual_lines = false, virtual_text = false, signs = false, update_in_insert = false }
-          else
-            diag_status = 1
-            vim.diagnostic.config { underline = true, virtual_lines = true, virtual_text = false, signs = true, update_in_insert = false }
-          end
-        end
-      end)(),
-      { buffer = event.buf, desc = 'LSP: Toggle diagnostics display' }
-    )
+    vim.keymap.set('n', '<leader>t', toggle_diagnostics, { buffer = event.buf, desc = 'LSP: Toggle diagnostics display' })
 
     local client = vim.lsp.get_client_by_id(event.data.client_id)
-    -- inlay suppoer
-    if client and client:supports_method 'textDocument/inlayHint' then
+    -- inlay hints
+    if client and client:supports_method('textDocument/inlayHint', event.buf) then
       vim.lsp.inlay_hint.enable(true, { bufnr = event.buf })
     end
     -- folding
-    if client and client:supports_method 'textDocument/foldingRange' then
-      local win = vim.api.nvim_get_current_win()
-      vim.wo[win][0].foldexpr = 'v:lua.vim.lsp.foldexpr()'
+    if client and client:supports_method('textDocument/foldingRange', event.buf) then
+      local win = vim.fn.bufwinid(event.buf)
+      if win ~= -1 then
+        vim.wo[win][0].foldmethod = 'expr'
+        vim.wo[win][0].foldexpr = 'v:lua.vim.lsp.foldexpr()'
+      end
     end
-
-    -- Highlight words under cursor
-    if client and client:supports_method(vim.lsp.protocol.Methods.textDocument_documentHighlight) and vim.bo.filetype ~= 'bigfile' then
-      local highlight_augroup = vim.api.nvim_create_augroup('kickstart-lsp-highlight', { clear = false })
-      vim.api.nvim_create_autocmd({ 'CursorHold', 'CursorHoldI' }, {
-        buffer = event.buf,
-        group = highlight_augroup,
-        callback = vim.lsp.buf.document_highlight,
-      })
-
-      vim.api.nvim_create_autocmd({ 'CursorMoved', 'CursorMovedI' }, {
-        buffer = event.buf,
-        group = highlight_augroup,
-        callback = vim.lsp.buf.clear_references,
-      })
-
-      vim.api.nvim_create_autocmd('LspDetach', {
-        group = vim.api.nvim_create_augroup('kickstart-lsp-detach', { clear = true }),
-        callback = function(event2)
-          vim.lsp.buf.clear_references()
-          vim.api.nvim_clear_autocmds { group = 'kickstart-lsp-highlight', buffer = event2.buf }
-          -- vim.cmd 'setl foldexpr <'
-        end,
-      })
-    end
+    -- References under the cursor are highlighted by vim-illuminate.
   end,
 })

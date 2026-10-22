@@ -72,7 +72,8 @@ return {
 
       vim.api.nvim_create_autocmd("FileType", {
         group = vim.api.nvim_create_augroup("portable-treesitter", { clear = true }),
-        pattern = parsers,
+        -- Parser names are not always filetypes (bash -> sh, vimdoc -> help).
+        pattern = vim.iter(parsers):map(vim.treesitter.language.get_filetypes):flatten():totable(),
         callback = function()
           pcall(vim.treesitter.start)
           vim.bo.indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
@@ -90,7 +91,7 @@ return {
     },
     keys = {
       {
-        "[c",
+        "[x",
         function()
           require("treesitter-context").go_to_context()
         end,

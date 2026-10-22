@@ -45,6 +45,13 @@ check cmake-language-server
 check codex
 check claude
 check pi
+# Run it the way lsp/cmake_ls.lua does: a newer pygls in the Python user site
+# otherwise shadows the 1.x it needs and the server dies on import.
+if command -v cmake-language-server >/dev/null 2>&1 &&
+  ! PYTHONNOUSERSITE=1 cmake-language-server --version >/dev/null 2>&1; then
+  printf '\033[31mFAIL\033[0m %-24s cannot start\n' cmake-language-server
+  failed=1
+fi
 if command -v pi >/dev/null 2>&1 && ! pi --help >/dev/null 2>&1; then
   printf '\033[31mFAIL\033[0m %-24s extensions could not load\n' pi
   failed=1

@@ -56,8 +56,9 @@ local function assert_mapping(mode, lhs)
 end
 
 vim.cmd.edit(root .. "/tests/fixtures/python_broken.py")
-assert_mapping("n", "Z")
-assert_mapping("x", "Z")
+assert_mapping("n", "ZZ")
+assert_mapping("x", "ZZ")
+assert_mapping("n", "QQ")
 assert_mapping("n", "gcc")
 assert_mapping("x", "gcc")
 wait_for_clients({ "python_ls", "ruff_ls" })
@@ -73,5 +74,13 @@ wait_for_clients({ "clangd_ls" })
 wait_for_diagnostics({ "clang" })
 assert_completion("clangd_ls")
 
-print("LSP_SMOKE_OK python_ls+ruff_ls clangd_ls diagnostics completion formatting")
+vim.cmd.edit(root .. "/init.lua")
+wait_for_clients({ "lua_ls" })
+assert_completion("lua_ls")
+
+vim.cmd.edit(root .. "/tests/fixtures/cmake/CMakeLists.txt")
+wait_for_clients({ "cmake_ls" })
+assert_completion("cmake_ls")
+
+print("LSP_SMOKE_OK python_ls+ruff_ls clangd_ls lua_ls cmake_ls diagnostics completion formatting")
 vim.cmd("qa!")

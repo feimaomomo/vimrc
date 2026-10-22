@@ -9,7 +9,6 @@ return {
   },
   config = function(_, opts)
     require('snacks').setup(opts)
-    vim.ui.select = Snacks.picker.select
     local map = function(key, func, desc)
       vim.keymap.set('n', key, func, { desc = desc })
     end

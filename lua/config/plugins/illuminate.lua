@@ -26,6 +26,17 @@ return {
 				-- See `:help mode()` for possible values
 				modes_allowlist = {},
 			})
+
+			local function link_highlights()
+				for _, group in ipairs({ "IlluminatedWordText", "IlluminatedWordRead", "IlluminatedWordWrite" }) do
+					vim.api.nvim_set_hl(0, group, { link = "Visual" })
+				end
+			end
+			link_highlights()
+			vim.api.nvim_create_autocmd("ColorScheme", {
+				group = vim.api.nvim_create_augroup("illuminate-highlights", { clear = true }),
+				callback = link_highlights,
+			})
 		end,
 	},
 }

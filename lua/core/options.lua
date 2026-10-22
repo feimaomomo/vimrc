@@ -51,4 +51,14 @@ opt.clipboard:append("unnamedplus") -- use system clipboard as default register
 opt.splitright = true -- split vertical window to the right
 opt.splitbelow = true -- split horizontal window to the bottom
 
-opt.iskeyword:append("-") -- consider string-string as whole word
+-- Treat kebab-case as one word only where `-` cannot be subtraction.
+vim.api.nvim_create_autocmd("FileType", {
+  group = vim.api.nvim_create_augroup("kebab-case-iskeyword", { clear = true }),
+  pattern = { "css", "scss", "less", "html" },
+  callback = function()
+    vim.opt_local.iskeyword:append("-")
+  end,
+})
+
+-- Folds come from LSP foldingRange (see core/lsp.lua); start with all open.
+opt.foldlevelstart = 99

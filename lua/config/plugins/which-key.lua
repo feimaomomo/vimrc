@@ -11,10 +11,7 @@ return {
       separator = "➜",
       group = "+",
     },
-  },
-  config = function()
-    local wk = require("which-key")
-    wk.add({
+    spec = {
       { "<leader>1", hidden = true },
       { "<leader>2", hidden = true },
       { "<leader>3", hidden = true },
@@ -42,6 +39,6 @@ return {
       { "g~",        hidden = true },
       { "g'",        hidden = true },
       { "g`",        hidden = true },
-    })
-  end,
+    },
+  },
 }

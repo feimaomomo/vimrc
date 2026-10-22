@@ -48,10 +48,6 @@ require("lazy").setup({
   install = {
     missing = vim.env.PORTABLE_NVIM_VERIFY ~= "1",
   },
-  checker = {
-    enable = true,
-    notify = false,
-  },
   change_detection = {
     notify = false,
   },
