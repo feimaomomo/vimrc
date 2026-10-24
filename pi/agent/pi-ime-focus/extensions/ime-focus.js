@@ -6,9 +6,11 @@ const ENABLE_FOCUS_REPORTING = "\x1b[?1004h";
 const DISABLE_FOCUS_REPORTING = "\x1b[?1004l";
 
 function announceMode(mode) {
-  // OSC 2 reaches Kitty directly, or becomes tmux's pane_title. The local
-  // Hammerspoon config watches it so a remote process can request English.
-  process.stdout.write(`\x1b]2;terminal:pi-${mode}\x07`);
+  // OSC 2 reaches Kitty directly, or becomes tmux's pane_title. Keep a tmux:
+  // prefix while inside tmux so Kitty's tmux-only shortcuts still match after
+  // Pi updates the title with its current Vim mode.
+  const prefix = process.env.TMUX ? "tmux:" : "";
+  process.stdout.write(`\x1b]2;${prefix}terminal:pi-${mode}\x07`);
 }
 
 function enterMode(mode) {
