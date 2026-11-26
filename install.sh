@@ -257,9 +257,20 @@ zmx_sha256() {
 	esac
 }
 
+# Prints the zmx version of a binary. A private socket directory makes this
+# check independent of XDG_RUNTIME_DIR, which some login nodes (ALCF Polaris)
+# export without creating it.
+zmx_version() {
+	local dir version
+	dir="$(mktemp -d "${TMPDIR:-/tmp}/nvim-zmx-check.XXXXXX")" || return 1
+	version="$(ZMX_DIR="$dir" "$1" version 2>/dev/null | awk '$1 == "zmx" {print $2; exit}')"
+	rm -rf "$dir"
+	[[ -n "$version" ]] && printf '%s\n' "$version"
+}
+
 install_zmx() {
 	local os arch platform expected temporary archive actual target="$ENV_PREFIX/bin/zmx"
-	if [[ -x "$target" ]] && "$target" version 2>/dev/null | awk '$1 == "zmx" {print $2; exit}' |
+	if [[ -x "$target" ]] && zmx_version "$target" |
 		grep -qxF "$ZMX_VERSION"; then
 		log "zmx $ZMX_VERSION is already installed"
 		return
@@ -290,7 +301,7 @@ install_zmx() {
 	actual="$(file_sha256 "$archive")"
 	[[ "$actual" == "$expected" ]] || die "zmx archive SHA-256 mismatch: expected $expected, got $actual"
 	tar -xzf "$archive" -C "$temporary" zmx
-	"$temporary/zmx" version >/dev/null 2>&1 || die "Downloaded zmx binary could not run on this system"
+	zmx_version "$temporary/zmx" >/dev/null || die "Downloaded zmx binary could not run on this system"
 	mkdir -p "$ENV_PREFIX/bin"
 	install -m 0755 "$temporary/zmx" "$target"
 	rm -rf "$temporary"
