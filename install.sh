@@ -299,9 +299,9 @@ install_zmx() {
 		return
 	fi
 	actual="$(file_sha256 "$archive")"
-	[[ "$actual" == "$expected" ]] || die "zmx archive SHA-256 mismatch: expected $expected, got $actual"
+	[[ "$actual" == "$expected" ]] || { rm -rf "$temporary"; die "zmx archive SHA-256 mismatch: expected $expected, got $actual"; }
 	tar -xzf "$archive" -C "$temporary" zmx
-	zmx_version "$temporary/zmx" >/dev/null || die "Downloaded zmx binary could not run on this system"
+	zmx_version "$temporary/zmx" >/dev/null || { rm -rf "$temporary"; die "Downloaded zmx binary could not run on this system"; }
 	mkdir -p "$ENV_PREFIX/bin"
 	install -m 0755 "$temporary/zmx" "$target"
 	rm -rf "$temporary"
