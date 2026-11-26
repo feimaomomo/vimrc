@@ -29,6 +29,7 @@ check npm
 check python3
 check zsh
 check tmux
+check zmx no
 check tree-sitter
 check lazygit
 check yazi

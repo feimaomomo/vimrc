@@ -12,6 +12,10 @@ readonly DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 readonly LOCAL_BIN="$HOME/.local/bin"
 readonly ENV_PREFIX="${NVIM_ENV_PREFIX:-$DATA_HOME/nvim-portable/env}"
 readonly MANAGED_MAMBA_BIN="$LOCAL_BIN/micromamba"
+# zmx (session persistence for Kitty's managed remote panes) is not packaged on
+# conda-forge. Pin the official static release and its SHA-256 per platform;
+# bump all four together after reviewing a new release.
+readonly ZMX_VERSION=1.0.2
 
 PACKAGE_MANAGER_BIN=''
 MODE=install
@@ -238,6 +242,56 @@ install_portable_tools() {
 	export PATH="$ENV_PREFIX/bin:$LOCAL_BIN:$PATH"
 	export CC="$ENV_PREFIX/bin/cc"
 	export CXX="$ENV_PREFIX/bin/c++"
+}
+
+zmx_sha256() {
+	case $1 in
+	linux-x86_64) printf '2b749b04da1f09a60d08b296b0cb530408f45673bd1e26d6c004b7d96d36f4dd' ;;
+	linux-aarch64) printf '630c47a1ff93112df5a323e4cee8bfe9abaec0d16501f7f160c33093b914ee7c' ;;
+	macos-aarch64) printf '340732b4c4251162487e7865af05b29c45b5ebb667647452916f37253c5e6565' ;;
+	macos-x86_64) printf '9c892d925f02de960ad29e81a8cd1d0ecab68d81178b7179bf8e8648cac12199' ;;
+	*) return 1 ;;
+	esac
+}
+
+install_zmx() {
+	local os arch platform expected temporary archive actual target="$ENV_PREFIX/bin/zmx"
+	if [[ -x "$target" ]] && "$target" version 2>/dev/null | awk '$1 == "zmx" {print $2; exit}' |
+		grep -qxF "$ZMX_VERSION"; then
+		log "zmx $ZMX_VERSION is already installed"
+		return
+	fi
+	case "$(uname -s)" in
+	Linux) os=linux ;;
+	Darwin) os=macos ;;
+	*) os=unsupported ;;
+	esac
+	case "$(uname -m)" in
+	x86_64 | amd64) arch=x86_64 ;;
+	arm64 | aarch64) arch=aarch64 ;;
+	*) arch=unsupported ;;
+	esac
+	platform="$os-$arch"
+	if ! expected="$(zmx_sha256 "$platform")"; then
+		warn "No pinned zmx build for $(uname -s) $(uname -m); Kitty's zmx backend is unavailable here"
+		return
+	fi
+	temporary="$(mktemp -d "${TMPDIR:-/tmp}/nvim-zmx.XXXXXX")"
+	trap 'rm -rf "$temporary"' RETURN
+	archive="$temporary/zmx.tar.gz"
+	log "Installing zmx $ZMX_VERSION ($platform) into $ENV_PREFIX/bin"
+	if ! (download "https://zmx.sh/a/zmx-$ZMX_VERSION-$platform.tar.gz" "$archive"); then
+		warn "Could not download zmx (configure HTTPS_PROXY if needed); Kitty's zmx backend is unavailable here"
+		return
+	fi
+	actual="$(file_sha256 "$archive")"
+	[[ "$actual" == "$expected" ]] || die "zmx archive SHA-256 mismatch: expected $expected, got $actual"
+	tar -xzf "$archive" -C "$temporary" zmx
+	"$temporary/zmx" version >/dev/null 2>&1 || die "Downloaded zmx binary could not run on this system"
+	mkdir -p "$ENV_PREFIX/bin"
+	install -m 0755 "$temporary/zmx" "$target"
+	rm -rf "$temporary"
+	trap - RETURN
 }
 
 install_ai_tools() {
@@ -685,6 +739,7 @@ main() {
 	install_claude_settings
 	install_pi_settings
 	install_portable_tools "$MODE"
+	install_zmx
 	sync_shell_plugins "$MODE"
 	install_shell_config
 	install_yazi_config

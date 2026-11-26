@@ -58,6 +58,10 @@ Missing dependencies are installed from conda-forge into
 `micromamba`, `mamba`, or `conda`; otherwise it downloads micromamba, with the
 official GitHub releases as a fallback when `micro.mamba.pm` is unavailable.
 This avoids depending on Homebrew, apt, dnf, pacman, or administrator access.
+zmx, the session keeper behind Kitty's managed remote panes, is not packaged on
+conda-forge: the installer downloads its pinned official static release into
+the same environment and verifies the archive's SHA-256. On an unsupported
+platform or without network access it warns and continues.
 Set `NVIM_ENV_PREFIX` if home-directory quotas require another location, such
 as a cluster scratch disk.
 
