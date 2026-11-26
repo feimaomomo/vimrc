@@ -60,8 +60,42 @@ end
 ---@class ClangdInitializeResult: lsp.InitializeResult
 ---@field offsetEncoding? string
 
+-- HPC login nodes cap each account's tasks (Polaris: 256 processes plus threads
+-- on a 256-core node). clangd sizes its worker pool by the cores, so there it
+-- aborts at startup ("pthread_create failed"). Same rule as shell/zshrc: under
+-- a cgroup task cap of 4096 or fewer, use 4 workers.
+local function task_capped()
+  local file = io.open('/proc/self/cgroup')
+  if not file then
+    return false
+  end
+  local group
+  for line in file:lines() do
+    group = line:match('^0::(.*)$') or group
+  end
+  file:close()
+  local dir = group and ('/sys/fs/cgroup' .. group) or ''
+  while dir:match('^/sys/fs/cgroup/.') do
+    local limit = io.open(dir .. '/pids.max')
+    if limit then
+      local max = tonumber(limit:read('*l') or '')
+      limit:close()
+      if max and max <= 4096 then
+        return true
+      end
+    end
+    dir = dir:match('^(.*)/[^/]*$')
+  end
+  return false
+end
+
+local cmd = { 'clangd', '--background-index', '--clang-tidy', '--completion-style=detailed' }
+if task_capped() then
+  table.insert(cmd, '-j=4')
+end
+
 return {
-  cmd = { 'clangd', '--background-index', '--clang-tidy', '--completion-style=detailed' },
+  cmd = cmd,
   filetypes = { 'c', 'cpp', 'objc', 'objcpp', 'cuda', 'proto' },
   root_markers = {
     '.clangd',
