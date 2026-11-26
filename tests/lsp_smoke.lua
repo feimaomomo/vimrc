@@ -4,8 +4,14 @@ local function fail(message)
   error("LSP smoke test failed: " .. message)
 end
 
+-- Generous: on a loaded HPC login node (Polaris: load ~230, 8 CPUs per
+-- account) the servers started earlier in this test, such as clangd indexing
+-- the standard library, keep the CPU busy and cmake-language-server only
+-- answers initialize after three cmake runs. A broken server still fails.
+local TIMEOUT = 60000
+
 local function wait_for_clients(expected, timeout)
-  local attached = vim.wait(timeout or 15000, function()
+  local attached = vim.wait(timeout or TIMEOUT, function()
     local names = {}
     for _, client in ipairs(vim.lsp.get_clients({ bufnr = 0 })) do
       names[client.name] = true
@@ -26,7 +32,7 @@ local function wait_for_clients(expected, timeout)
 end
 
 local function wait_for_diagnostics(expected_sources, timeout)
-  if not vim.wait(timeout or 15000, function()
+  if not vim.wait(timeout or TIMEOUT, function()
     local found = {}
     for _, diagnostic in ipairs(vim.diagnostic.get(0)) do
       found[(diagnostic.source or ""):lower()] = true
