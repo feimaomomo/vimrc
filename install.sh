@@ -160,6 +160,9 @@ install_micromamba() {
 
 select_package_manager() {
 	local manager resolved
+	# micromamba 2.8 aborts at startup (tl::bad_expected_access) when its default
+	# root prefix exists but is empty. An empty directory holds nothing, so drop it.
+	rmdir "$DATA_HOME/mamba" 2>/dev/null || true
 	if [[ -x "$MANAGED_MAMBA_BIN" ]]; then
 		if "$MANAGED_MAMBA_BIN" --version >/dev/null 2>&1; then
 			PACKAGE_MANAGER_BIN="$MANAGED_MAMBA_BIN"
